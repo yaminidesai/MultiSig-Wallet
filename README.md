@@ -1,57 +1,235 @@
-# Sample Hardhat 3 Project (`mocha` and `ethers`)
+# MultiSig Wallet
 
-This project showcases a Hardhat 3 project using `mocha` for tests and the `ethers` library for Ethereum interactions.
+A secure Ethereum MultiSig Wallet built with **Solidity, Hardhat 3, and ethers.js**.
 
-To learn more about Hardhat 3, please visit the [Getting Started guide](https://hardhat.org/docs/getting-started#getting-started-with-hardhat-3). To share your feedback, join our [Hardhat 3](https://hardhat.org/hardhat3-telegram-group) Telegram group or [open an issue](https://github.com/NomicFoundation/hardhat/issues/new) in our GitHub issue tracker.
+This project implements a **2-of-3 multisignature wallet**, where transactions require confirmation from at least two of the three wallet owners before they can be executed.
 
-## Project Overview
+## Overview
 
-This example project includes:
+A MultiSig Wallet improves security by requiring multiple authorized owners to approve a transaction instead of relying on a single private key.
 
-- A simple Hardhat configuration file.
-- Foundry-compatible Solidity unit tests.
-- TypeScript integration tests using `mocha` and ethers.js
-- Examples demonstrating how to connect to different types of networks, including locally simulating OP mainnet.
+For this project:
 
-## Usage
+- **3 owners** are configured
+- **2 confirmations** are required to execute a transaction
+- Owners can submit, confirm, revoke, and execute transactions
+- The wallet can receive and hold ETH
+- Transactions cannot be executed more than once
+- Only authorized owners can perform wallet operations
 
-### Running Tests
+## Features
 
-To run all the tests in the project, execute the following command:
+- 2-of-3 multisignature authorization
+- ETH deposits
+- Transaction submission
+- Transaction confirmation
+- Confirmation revocation
+- Transaction execution
+- Transaction and wallet balance queries
+- Owner-only access control
+- Protection against duplicate confirmations
+- Protection against executing transactions twice
+- Reentrancy protection using OpenZeppelin `ReentrancyGuard`
+- Automated TypeScript tests using Mocha and ethers.js
 
-```shell
+## Smart Contract
+
+The main contract is:
+
+`contracts/MultiSigWallet.sol`
+
+### Transaction Flow
+
+```text
+Owner submits transaction
+        ↓
+Owner confirmations
+        ↓
+2 confirmations reached
+        ↓
+Transaction can be executed
+        ↓
+ETH is transferred
+```
+
+For example, with three owners:
+
+```text
+Owner 1 ──┐
+          ├── 2 confirmations ──→ Execute
+Owner 2 ──┘
+
+Owner 3 can also participate in the approval process.
+```
+
+## Security
+
+The wallet uses several checks to protect transactions:
+
+- Only registered owners can submit, confirm, revoke, or execute transactions.
+- A transaction cannot be confirmed twice by the same owner.
+- A transaction cannot be revoked after execution.
+- A transaction cannot be executed without the required number of confirmations.
+- An executed transaction cannot be executed again.
+- `ReentrancyGuard` is used to protect the execution function from reentrancy attacks.
+- Duplicate owners are rejected during deployment.
+- The required confirmation count must be greater than zero and cannot exceed the number of owners.
+
+## Project Structure
+
+```text
+MultiSig-Wallet/
+├── contracts/
+│   └── MultiSigWallet.sol
+├── test/
+│   └── MultiSigWallet.ts
+├── scripts/
+│   ├── deploy.ts
+│   ├── fund.ts
+│   └── send-op-tx.ts
+├── hardhat.config.ts
+├── package.json
+├── tsconfig.json
+├── README.md
+└── .gitignore
+```
+
+## Tech Stack
+
+- **Solidity**
+- **Hardhat 3**
+- **TypeScript**
+- **ethers.js**
+- **Mocha**
+- **Chai**
+- **OpenZeppelin Contracts**
+- **Ethereum**
+
+## Testing
+
+The project includes automated tests covering:
+
+- Wallet deployment
+- Owner configuration
+- Confirmation requirements
+- ETH deposits
+- Transaction submission
+- Owner authorization
+- Transaction confirmation
+- Duplicate confirmation prevention
+- Confirmation revocation
+- Insufficient confirmation handling
+- Transaction execution
+- Double-execution prevention
+
+Run the complete test suite with:
+
+```bash
 npx hardhat test
 ```
 
-You can also selectively run the Solidity or `mocha` tests:
+Current test suite:
 
-```shell
-npx hardhat test solidity
-npx hardhat test mocha
+```text
+12 passing
 ```
 
-### Make a deployment to Sepolia
+## Local Deployment
 
-This project includes an example Ignition module to deploy the contract. You can deploy this module to a locally simulated chain or to Sepolia.
+Start a local Hardhat blockchain:
 
-To run the deployment to a local chain:
-
-```shell
-npx hardhat ignition deploy ignition/modules/Counter.ts
+```bash
+npx hardhat node
 ```
 
-To run the deployment to Sepolia, you need an account with funds to send the transaction. The provided Hardhat configuration includes a Configuration Variable called `SEPOLIA_PRIVATE_KEY`, which you can use to set the private key of the account you want to use.
+In another terminal, deploy the wallet:
 
-You can set the `SEPOLIA_PRIVATE_KEY` variable using the `hardhat-keystore` plugin or by setting it as an environment variable.
-
-To set the `SEPOLIA_PRIVATE_KEY` config variable using `hardhat-keystore`:
-
-```shell
-npx hardhat keystore set SEPOLIA_PRIVATE_KEY
+```bash
+npx hardhat run scripts/deploy.ts --network localhost
 ```
 
-After setting the variable, you can run the deployment with the Sepolia network:
+The deployment script creates a wallet with three local Hardhat accounts as owners and requires two confirmations.
 
-```shell
-npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
+## Funding the Wallet
+
+After deployment, the wallet can receive ETH.
+
+The included funding script sends 5 ETH from Owner 1 to the MultiSig Wallet:
+
+```bash
+npx hardhat run scripts/fund.ts --network localhost
 ```
+
+## Example MultiSig Transaction
+
+A local end-to-end test was performed using three wallet owners.
+
+### Transaction 1
+
+Owner 1 submitted a transaction to send **1 ETH** to Owner 3.
+
+```text
+Owner 1 → Submit
+Owner 1 → Confirm
+Owner 2 → Confirm
+Owner 2 → Execute
+```
+
+The transaction executed successfully after reaching the required **2 confirmations**.
+
+### Transaction 2
+
+Owner 3 submitted a transaction to send **0.5 ETH** to Owner 3.
+
+```text
+Owner 3 → Submit
+Owner 3 → Confirm
+Owner 2 → Confirm
+Owner 2 → Execute
+```
+
+This transaction also executed successfully after reaching the required **2 confirmations**.
+
+The wallet balance changed:
+
+```text
+Initial balance: 5 ETH
+Transaction 1:  -1 ETH
+Transaction 2:  -0.5 ETH
+Final balance:  3.5 ETH
+```
+
+The contract also correctly rejected an attempt to execute an already executed transaction.
+
+## Learning Goals
+
+This project was built to understand and demonstrate:
+
+- Solidity smart contract development
+- Ethereum transaction execution
+- Multisignature authorization
+- Smart contract access control
+- ETH transfers using low-level calls
+- Reentrancy protection
+- Solidity testing
+- Hardhat development workflows
+- ethers.js contract interaction
+- Local blockchain development and testing
+
+## Future Improvements
+
+Potential extensions include:
+
+- Owner management
+- Adding and removing owners through multisig approval
+- Daily spending limits
+- Transaction cancellation
+- Event-based transaction history
+- More comprehensive security testing
+- Deployment to a public testnet
+- Integration with a frontend interface
+- Hardware wallet or external signer integration
+
+## License
+
+MIT
